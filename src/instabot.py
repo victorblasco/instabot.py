@@ -498,7 +498,7 @@ class InstaBot:
                                 self.write_log(
                                     "Keep calm - It's your own media ;)")
                                 return False
-                            if check_already_liked(self, media_id=self.media_by_tag[i]['node']['id']) == 1:
+                            if self.try_check_already_liked_forever(self.media_by_tag[i]['node']['id']) == 1:
                                 self.write_log("Keep calm - It's already liked ;)")
                                 return False
                             try:
@@ -544,15 +544,7 @@ class InstaBot:
                             if like != 0:
                                 if like.status_code == 200:
                                     # Like, all ok!
-                                    self.error_400 = 0
-                                    self.like_counter += 1
-                                    log_string = "Liked: %s. Like #%i." % \
-                                                 (self.media_by_tag[i]['node']['id'],
-                                                  self.like_counter)
-                                    insert_media(self,
-                                                 media_id=self.media_by_tag[i]['node']['id'],
-                                                 status="200")
-                                    self.write_log(log_string)
+                                    self.try_insert_media_forever(self.media_by_tag[i]['node']['id'], "200")
                                 elif like.status_code == 400:
                                     log_string = "Not liked: %i" \
                                                  % (like.status_code)
@@ -590,6 +582,31 @@ class InstaBot:
                         return False
             else:
                 self.write_log("No media to like!")
+
+    def try_insert_media_forever(self, media_id, status):
+        self.error_400 = 0
+        try:
+            insert_media(self,
+                         media_id=media_id,
+                         status=status)
+            self.like_counter += 1
+            log_string = "Liked: %s. Like #%i." % \
+                (media_id,
+                 self.like_counter)
+
+            self.write_log(log_string)
+        except sqlite3.OperationalError:
+            self.write_log("############# sqlite3.OperationalError insert_media() EXCEPTION")
+            time.sleep(2)
+            self.try_insert_media_forever(media_id, status)
+
+    def try_check_already_liked_forever(self, media_id):
+        try:
+            return check_already_liked(self, media_id=media_id)
+        except sqlite3.OperationalError:
+            self.write_log("############# sqlite3.OperationalError check_already_liked() EXCEPTION")
+            time.sleep(2)
+            self.try_check_already_liked_forever(media_id)
 
     def like(self, media_id):
         """ Send http request to like media by ID """
